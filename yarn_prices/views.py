@@ -8,3 +8,6 @@ def show_home_page(request):
 
 def show_price_charts(request):
     return HttpResponse('Charts page')
+
+def show_charts_page(request):
+    return render(request, 'yarn_prices/charts.html')
