@@ -56,26 +56,29 @@ class MagicSoup:
         
         self.price = soup.select(self.selector)[0].text[:4]
         if self.is_price_correct():
-            self.correct_comma_to_dot()
+            self.price = self.correct_comma_to_dot()
+        self.price = self.convert_price_to_float()
 
+    # проверка на наличие в price символа <,>
     def is_price_correct(self) -> bool:
         return ',' in self.price
 
+    # исправление символа <,> на <.>
     def correct_comma_to_dot(self) -> str:
         return self.price.replace(',', '.')
 
+    # конвертация строкового значения price в float
+    def convert_price_to_float(self) -> float:
+        return float(self.price)
+
+    # возврат итогового набора значений
     def tasting(self) -> list:
+        self.cook_soup()
         return [self.title, self.price]
 
-        
+
 def magic_soup() -> list:
-    dataset = []
-# данные для скрейпинга
-    for site in SITES:
-        soup = MagicSoup(*site.values())
-        soup.cook_soup()
-        dataset.append(soup.tasting())
-    return dataset
+    return [MagicSoup(*site.values()).tasting() for site in SITES]
         
 
 if __name__ == '__main__':
