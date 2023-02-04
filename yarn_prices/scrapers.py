@@ -1,5 +1,6 @@
 
 from bs4 import BeautifulSoup
+from tqdm import tqdm
 import requests
 
 from datetime import datetime
@@ -18,46 +19,47 @@ SITES = [
     "url": "https://1klubok.by/pryazha-pehorka/detskaya-novinka",
     "selector": "td.price-amount"},
 
-    # {"title": "yarnstore",
-    # "url": "https://yarnstore.by/products/detskaya-novinka-pehorka",
-    # "selector": ""},
+    {"title": "yarnstore",
+    "url": "https://yarnstore.by/products/detskaya-novinka-pehorka",
+    "selector": ".tab-content div.price span"},
 
     # {"title": "https://kupimotok.by/",
     # "url": "",
     # "selector": ""},
 
-    # {"title": "zigzagshop",
-    # "url": "https://zigzagshop.by/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj",
-    # "selector": ""},
+    {"title": "zigzagshop",
+    "url": "https://zigzagshop.by/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj",
+    "selector": ".product-price-value > .product-price-col:nth-child(2) span"},
 
-    # {"title": "петелька",
-    # "url": "https://xn--80ajauevw6f.xn--90ais/p103514576-detskaya-novinka.html",
-    # "selector": ""},
+    {"title": "петелька",
+    "url": "https://xn--80ajauevw6f.xn--90ais/p103514576-detskaya-novinka.html",
+    "selector": ".b-product-cost__price span:first-child"},
 
-    # {"title": "kis",
-    # "url": "https://kis.by/pryazha-detskaya-novinka-1-motka-50g-200m-pekhorka-18-persik",
-    # "selector": ""},
+    {"title": "kis",
+    "url": "https://kis.by/pryazha-detskaya-novinka-1-motka-50g-200m-pekhorka-18-persik",
+    "selector": ".price > span"},
 
-#     {"title": "miya",
-#     "url": "https://miya.by/g8001755-pryazha-pehorka-detskaya",
-#     "selector": ""},
+    {"title": "miya",
+    "url": "https://miya.by/p106143454-pryazha-pehorka-detskaya.html",
+    "selector": ".b-product-cost__price span"},
 ]
 
-
 class MagicSoup:
-    def __init__(self, title: str, url: str, selector: str) -> None:
-        self.title = title
+    def __init__(self, url: str, selector: str) -> None:
         self.url = url
         self.selector = selector
 
     def cook_soup(self) -> None:
         html_text = requests.get(self.url).text
         soup = BeautifulSoup(html_text, 'lxml')
-        
-        self.price = soup.select(self.selector)[0].text[:4]
-        if self.is_price_correct():
-            self.price = self.correct_comma_to_dot()
-        self.price = self.convert_price_to_float()
+
+        if soup.select(self.selector):
+            self.price = soup.select(self.selector)[0].text[:4]
+            if self.is_price_correct():
+                self.price = self.correct_comma_to_dot()
+            self.price = self.convert_price_to_float()
+        else:
+            self.price = 0
 
     # проверка на наличие в price символа <,>
     def is_price_correct(self) -> bool:
@@ -72,17 +74,23 @@ class MagicSoup:
         return float(self.price)
 
     # возврат итогового набора значений
-    def tasting(self) -> list:
+    def tasting(self) -> float:
         self.cook_soup()
-        return [self.title, self.price]
-
+        if self.price:
+            return self.price
+        else:
+            return 0
 
 def magic_soup() -> list:
-    return [MagicSoup(*site.values()).tasting() for site in SITES]
-        
+    data_set = []
+    for site in tqdm(SITES, desc='fetching data...', colour='green'):
+        data_set.append({'shop_name': site.get('title'), \
+            'shop_url': site.get('url'), 
+            'yarn_name': 'Pehorka', 
+            'yarn_price': MagicSoup(site.get('url', ''), site.get('selector', '')).tasting()})
+    return data_set
+    # return [MagicSoup(*site.values()).tasting() for site in tqdm(SITES, 'fetching data...', colour='green')]
 
 if __name__ == '__main__':
-    time_start = datetime.now()
-    print(magic_soup())
-    timer = datetime.now() - time_start
-    print(f"timer: {str(timer): >15}")
+    for data_element in magic_soup():
+        print(data_element)
