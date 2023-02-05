@@ -61,14 +61,25 @@
 </style>
 
 {% comment %} Скрипт графика {% endcomment %}
-<script>
+{% comment %} <script>
   document.addEventListener('DOMContentLoaded', function () {Highcharts.chart('container', {{ chart|safe }})});
-</script>
+</script> {% endcomment %}
+
 {% endblock head %}
 
 {% block content %}
 {% comment %} контейнер графика {% endcomment %}
 <figure class="highcharts-figure">
-  <div id="container"></div>
+  <div id="container" data-url="{% url 'yarn_prices_urls:charts_data' %}"></div>
 </figure>
-  {% endblock content %}
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script>
+  $.ajax({
+    url: $("#container").attr("data-url"),
+    dataType: 'json',
+    success: function (data) {
+      Highcharts.chart("container", data);
+    }
+  });
+</script>
+{% endblock content %}

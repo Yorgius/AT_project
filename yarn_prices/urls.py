@@ -8,5 +8,6 @@ app_name = 'yarn_prices_urls'
 urlpatterns = [
     path('', show_home_page, name='home'),
     path('charts/', show_charts_page, name='charts'),
-    path('loading_data/', save_data_by_bs, name='start_bs'),
+    path('charts-data/', charts_data, name='charts_data'),
+    # path('loading_data/', save_data_by_bs, name='start_bs'),
 ]

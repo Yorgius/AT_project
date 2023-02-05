@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, HttpResponse
+from django.http import JsonResponse
 from datetime import datetime
 import json
 
@@ -13,10 +14,13 @@ def show_home_page(request):
 
 # визуализация полученных данных в HighCharts
 def show_charts_page(request):
+    return render(request, 'yarn_prices/charts.html')
+
+def charts_data(request):
     # Если в базе нет записи с текущей датой
     todays_day = datetime.now().date()
     if not Yarn.objects.filter(date_added=todays_day).exists():
-        return redirect('yarn_prices_urls:start_bs')
+        save_data_to_db_by_bs()
     
     data_values, categories = [], []
     data_set = Yarn.objects.select_related('shop').filter(date_added=todays_day).order_by('price')
@@ -41,7 +45,7 @@ def show_charts_page(request):
         }
     }
 
-    chart = json.dumps({
+    chart = {
         'chart': {'type': 'column'},
         'legend': {'enabled': True},
         'title': {'text': 'Сравнение цен на пряжу "Детская новинка"'},
@@ -51,12 +55,13 @@ def show_charts_page(request):
         'legend': {'enabled': False},
         'tooltip': {'pointFormat': "Цена: {point.y:.2f}"},
         'series': [data],
-    })
+    }
 
-    return render(request, 'yarn_prices/charts.html', {'chart': chart})
+    return JsonResponse(chart)
 
-def save_data_by_bs(request):
-    dataset = magic_soup()
+# the function starts the web parser and saves the received data to the database
+def save_data_to_db_by_bs() -> None:
+    dataset: list = magic_soup()
     for data in dataset:
         try:
             if Shop.objects.filter(name=data.get('shop_name')).exists():
@@ -66,7 +71,7 @@ def save_data_by_bs(request):
             yarn = Yarn(name=data.get('yarn_name'), price=data.get('yarn_price'), shop=shop)
             yarn.save()
         except Exception as exptn:
-            print('Вызвано исключение при сохранении нового объекта в БД')
             print(f'Exception: {exptn}')
+            print('an exception was thrown while the data was being saved to the database')
             return redirect('yarn_prices_urls:home')
     return redirect('yarn_prices_urls:charts')
