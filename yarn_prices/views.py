@@ -9,57 +9,143 @@ from .scrapers import magic_soup
 
 # main page
 def show_home_page(request):
-    context = [{'title': 'Home'}]
-    return render(request, 'yarn_prices/home.html', )
+    text = 'With the help of this site, \
+        in the graphics section, you can find out where to buy yarn at the best price among the stores in your city, \
+            find out the dynamics of yarn price growth, as well as in which store you can buy the colors of yarn you are \
+                interested in.'
+    return render(request, 'yarn_prices/home.html', context={'title': 'Home', 'description_text': text})
 
 # визуализация полученных данных в HighCharts
 def show_charts_page(request):
-    return render(request, 'yarn_prices/charts.html')
-
-def charts_data(request):
     # Если в базе нет записи с текущей датой
     todays_day = datetime.now().date()
     if not Yarn.objects.filter(date_added=todays_day).exists():
         save_data_to_db_by_bs()
-    
+    return render(request, 'yarn_prices/charts.html', context={'title': 'Charts'})
+
+def column_chart_data(request):
+    # подготовка данных для графика
     data_values, categories = [], []
-    data_set = Yarn.objects.select_related('shop').filter(date_added=todays_day).order_by('price')
+    data_set = Yarn.objects.select_related('shop').filter(date_added=datetime.now().date()).order_by('price')
     for yarn in data_set:
         categories.append(yarn.shop.name)
         data_values.append([yarn.shop.name, yarn.price])
-    # конфигурация графика
+    
+    # конфигурация данных для графика
     data = {
         'name': 'Цена',
         'data': data_values,
-        'color': '#87CEEB',
+        'color': '#FFCCCC',
         'dataLabels': {
             'enabled': True,
-            'color': '#FFFFFF',
+            'color': '#000000',
             'align': 'center',
             'format': '{point.y:.2f}',
             # 'y': 0,
             'style': {
                 'fontSize': '10px',
-                'fontFamily': 'Verdana, sans-serif'
             }
         }
     }
 
+    # общая конфигурация графика
     chart = {
         'chart': {'type': 'column'},
         'legend': {'enabled': True},
-        'title': {'text': 'Сравнение цен на пряжу "Детская новинка"'},
-        'subtitle': {'text': 'по РБ'},
+        'title': {'text': 'Сравнение цен на пряжу "Детская новинка"', 'align': 'left'},
+        'subtitle': {'text': datetime.now().date(), 'align': 'left'},
         'xAxis': {'categories': categories},
         'yAxis': {'min': 0, 'title': {'text': 'BYN'}},
-        'legend': {'enabled': False},
         'tooltip': {'pointFormat': "Цена: {point.y:.2f}"},
         'series': [data],
     }
 
     return JsonResponse(chart)
 
-# the function starts the web parser and saves the received data to the database
+def basic_line_chart_data(request):
+    # подготовка данных для графика
+    ...
+    # конфигурация данных для графика
+    data = [{
+            'name': 'Installation & Developers',
+            'data': [43934, 48656, 65165, 81827, 112143, 142383, 171533, 165174, 155157, 161454, 154610]
+        }, 
+        {
+            'name': 'Manufacturing',
+            'data': [24916, 37941, 29742, 29851, 32490, 30282, 38121, 36885, 33726, 34243, 31050]
+        }, 
+        {
+            'name': 'Sales & Distribution',
+            'data': [11744, 30000, 16005, 19771, 20185, 24377, 32147, 30912, 29243, 29213, 25663]
+        }, 
+        {
+            'name': 'Operations & Maintenance',
+            'data': [None, None, None, None, None, None, None, None, 11164, 11218, 10077],
+        }, 
+        {
+            'name': 'Other',
+            'data': [21908, 5548, 8105, 11248, 8989, 11816, 18274, 17300, 13053, 11906, 10073]
+        }]
+    # конфигурация графика
+    chart = {
+        'title': {
+            'text': 'Динамика изменений цен на пряжу',
+            'align': 'left'
+        },
+    
+        'subtitle': {
+            'text': 'г. Минск',
+            'align': 'left'
+        },
+    
+        'yAxis': {
+            'title': {
+                'text': 'BYN'
+            }
+        },
+    
+        'xAxis': {
+            'accessibility': {
+                'rangeDescription': 'Range: 2010 to 2020'
+            }
+        },
+    
+        'legend': {
+            'layout': 'vertical',
+            'align': 'right',
+            'verticalAlign': 'middle'
+        },
+    
+        'plotOptions': {
+            'series': {
+                'label': {
+                    'connectorAllowed': 'false'
+                },
+                'pointStart': 2010
+            }
+        },
+    
+        'series': data,
+    
+        'responsive': {
+            'rules': [{
+                'condition': {
+                    'maxWidth': 500
+                },
+                'chartOptions': {
+                    'legend': {
+                        'layout': 'horizontal',
+                        'align': 'center',
+                        'verticalAlign': 'bottom'
+                    }
+                }
+            }]
+        }
+    }
+
+    return JsonResponse(chart)
+
+# the function starts the BS4 web parser and saves the received data to the database
 def save_data_to_db_by_bs() -> None:
     dataset: list = magic_soup()
     for data in dataset:

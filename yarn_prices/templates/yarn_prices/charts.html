@@ -9,7 +9,6 @@
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
 
-
 {% comment %} Стили графика {% endcomment %}
 <style>
   #container {
@@ -60,26 +59,49 @@
   }
 </style>
 
-{% comment %} Скрипт графика {% endcomment %}
-{% comment %} <script>
-  document.addEventListener('DOMContentLoaded', function () {Highcharts.chart('container', {{ chart|safe }})});
-</script> {% endcomment %}
-
 {% endblock head %}
 
+
 {% block content %}
-{% comment %} контейнер графика {% endcomment %}
-<figure class="highcharts-figure">
-  <div id="container" data-url="{% url 'yarn_prices_urls:charts_data' %}"></div>
-</figure>
-<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-<script>
-  $.ajax({
-    url: $("#container").attr("data-url"),
-    dataType: 'json',
-    success: function (data) {
-      Highcharts.chart("container", data);
-    }
-  });
-</script>
+
+{% comment %} charts containers {% endcomment %}
+<div class="container text-center">
+  <div class="row">
+    <div class="col-sm-3">
+    </div>
+    <div class="col">
+        {% comment %} column chart {% endcomment %}
+        {% comment %} Price comparison chart for the current date among stores {% endcomment %}
+        <figure class="highcharts-figure">
+            <div id="column_chart" data-url="{% url 'yarn_prices_urls:column_chart_data' %}"></div>
+        </figure>
+        <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+        {% comment %} ajax request {% endcomment %}
+        <script>
+            $.ajax({
+            url: $("#column_chart").attr("data-url"),
+            dataType: 'json',
+            success: function (data) {
+                Highcharts.chart("column_chart", data);
+            }
+            });
+        </script>
+        {% comment %} basic line chart {% endcomment %}
+        {% comment %} dynamics of price changes over a period of time {% endcomment %}
+        <figure class="highcharts-figure">
+            <div id="basic_line_chart" data-url="{% url 'yarn_prices_urls:basic_line_chart_data' %}"></div>
+        </figure>
+        <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+        {% comment %} ajax request {% endcomment %}
+        <script>
+            $.ajax({
+                url: $("#basic_line_chart").attr("data-url"),
+                dataType: 'json',
+                success: function (data) {Highcharts.chart("basic_line_chart", data);} 
+            });
+        </script>
+    </div>
+  </div>
+</div>
+
 {% endblock content %}
