@@ -25,10 +25,11 @@ def show_charts_page(request):
 
 def column_chart_data(request):
     # подготовка данных для графика
-    data_values, categories = [], []
+    data_values = []
+    # categories = []
     data_set = Yarn.objects.select_related('shop').filter(date_added=datetime.now().date()).order_by('price')
     for yarn in data_set:
-        categories.append(yarn.shop.name)
+        # categories.append(yarn.shop.name)
         data_values.append([yarn.shop.name, yarn.price])
     
     # конфигурация данных для графика
@@ -51,10 +52,11 @@ def column_chart_data(request):
     # общая конфигурация графика
     chart = {
         'chart': {'type': 'column'},
-        'legend': {'enabled': True},
+        'legend': {'enabled': False},
         'title': {'text': 'Сравнение цен на пряжу "Детская новинка"', 'align': 'left'},
         'subtitle': {'text': datetime.now().date(), 'align': 'left'},
-        'xAxis': {'categories': categories},
+        # 'xAxis': {'categories': categories},
+        'xAxis': {'type': 'category'},
         'yAxis': {'min': 0, 'title': {'text': 'BYN'}},
         'tooltip': {'pointFormat': "Цена: {point.y:.2f}"},
         'series': [data],
@@ -64,28 +66,35 @@ def column_chart_data(request):
 
 def basic_line_chart_data(request):
     # подготовка данных для графика
-    ...
+    dates = sorted(set(yarn.date_added for yarn in Yarn.objects.all()))
+    shops = Shop.objects.all()
+
     # конфигурация данных для графика
-    data = [{
-            'name': 'Installation & Developers',
-            'data': [43934, 48656, 65165, 81827, 112143, 142383, 171533, 165174, 155157, 161454, 154610]
-        }, 
-        {
-            'name': 'Manufacturing',
-            'data': [24916, 37941, 29742, 29851, 32490, 30282, 38121, 36885, 33726, 34243, 31050]
-        }, 
-        {
-            'name': 'Sales & Distribution',
-            'data': [11744, 30000, 16005, 19771, 20185, 24377, 32147, 30912, 29243, 29213, 25663]
-        }, 
-        {
-            'name': 'Operations & Maintenance',
-            'data': [None, None, None, None, None, None, None, None, 11164, 11218, 10077],
-        }, 
-        {
-            'name': 'Other',
-            'data': [21908, 5548, 8105, 11248, 8989, 11816, 18274, 17300, 13053, 11906, 10073]
-        }]
+    data_set = []
+    for shop in shops:
+        shop_prices_by_time = []
+        yarns = shop.yarn_set.all().order_by('date_added')
+        len_dates = len(dates)
+        len_yarns =len(yarns) 
+        if not len_dates == len_yarns:
+            steps = len_dates - len_yarns
+            shop_prices_by_time.extend([None] * steps)
+        for yarn in yarns:
+            shop_prices_by_time.append(yarn.price)
+    
+        
+        data_set.append({
+            'name': shop.name, 
+            'data': shop_prices_by_time, 
+            'lineWidth': 2,
+            'marker': {
+                'radius': 2, 
+                'symbol': 'circle'
+                }
+            })
+    
+    categories = [date.strftime('%d-%m-%Y') for date in dates]
+
     # конфигурация графика
     chart = {
         'title': {
@@ -105,15 +114,24 @@ def basic_line_chart_data(request):
         },
     
         'xAxis': {
+            'categories': categories,
             'accessibility': {
                 'rangeDescription': 'Range: 2010 to 2020'
+            },
+            'labels': {
+                'rotation': -45,
+                'style': {
+                    'fontSize': '13px',
+                    'fontFamily': 'Verdana, sans-serif'
+                }
             }
+
         },
     
         'legend': {
-            'layout': 'vertical',
+            'layout': 'horizontal',
             'align': 'right',
-            'verticalAlign': 'middle'
+            # 'verticalAlign': 'middle'
         },
     
         'plotOptions': {
@@ -121,11 +139,11 @@ def basic_line_chart_data(request):
                 'label': {
                     'connectorAllowed': 'false'
                 },
-                'pointStart': 2010
+                # 'pointStart': xAxis_start_point
             }
         },
     
-        'series': data,
+        'series': data_set,
     
         'responsive': {
             'rules': [{
