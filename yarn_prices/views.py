@@ -66,23 +66,17 @@ def column_chart_data(request):
 
 def basic_line_chart_data(request):
     # подготовка данных для графика
-    dates = sorted(set(yarn.date_added for yarn in Yarn.objects.all()))
     shops = Shop.objects.all()
-
-    # конфигурация данных для графика
+    
     data_set = []
     for shop in shops:
         shop_prices_by_time = []
         yarns = shop.yarn_set.all().order_by('date_added')
-        len_dates = len(dates)
-        len_yarns =len(yarns) 
-        if not len_dates == len_yarns:
-            steps = len_dates - len_yarns
-            shop_prices_by_time.extend([None] * steps)
         for yarn in yarns:
-            shop_prices_by_time.append(yarn.price)
+            date = yarn.date_added.strftime('%d-%m-%Y')
+            shop_prices_by_time.append([date , yarn.price])
     
-        
+        # конфигурация данных для графика
         data_set.append({
             'name': shop.name, 
             'data': shop_prices_by_time, 
@@ -93,8 +87,6 @@ def basic_line_chart_data(request):
                 }
             })
     
-    categories = [date.strftime('%d-%m-%Y') for date in dates]
-
     # конфигурация графика
     chart = {
         'title': {
@@ -114,7 +106,7 @@ def basic_line_chart_data(request):
         },
     
         'xAxis': {
-            'categories': categories,
+            'type': 'category',
             'accessibility': {
                 'rangeDescription': 'Range: 2010 to 2020'
             },
@@ -139,7 +131,6 @@ def basic_line_chart_data(request):
                 'label': {
                     'connectorAllowed': 'false'
                 },
-                # 'pointStart': xAxis_start_point
             }
         },
     
