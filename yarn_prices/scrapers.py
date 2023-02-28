@@ -1,126 +1,459 @@
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as bs
 from tqdm import tqdm
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from lxml import etree
+
 import requests
+from requests import session
 
-from datetime import datetime
+from pprint import pprint
 
 
-SITES = [
-    {"title": "nitti",
-    "url": "https://nitti.by/catalog/pryazha_1/26470/?oid=23622",
-    "selector": ".info_item span.price_value"},
+class Soup:
+    def __init__(self) -> None:
+        self.headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'}
+
+    def get_page_source(self, url, need_response_by_selenium=False) -> None:
+        match need_response_by_selenium:
+            case True:
+                option = webdriver.ChromeOptions()
+                option.add_argument('--headless')
+                driver = webdriver.Chrome(options=option)
+                driver.set_window_size(1920, 1080)
+                driver.implicitly_wait(5)
+                
+                driver.get(url)
+                response = driver.page_source
+                driver.quit()
+                self.soup  = bs(response, 'lxml')
+            case _:
+                with session() as s:
+                    self.response = s.get(url, headers=self.headers)
+                    match self.response.status_code:
+                        case 200:
+                            self.soup  = bs(self.response.content, 'lxml')
+
+    def get_item(self, selector):
+        return self.soup.select_one(selector)
+
+    def get_items(self, selector) -> list:
+        return self.soup.select(selector)
+
+    def is_item_present(self, selector) -> bool:
+        return True if self.soup.select(selector) else False
+
+    def get_item_in_tag(self, tag, selector):
+        return tag.select_one(selector)
+
+    def preparing_data(self, shop, url, price, colors) -> dict:
+        return {
+            'shop': shop,
+            'url': url,
+            'yarn': 'pehorka',
+            'price': price,
+            'colors': colors
+        }
+
+
+class MiyaParser(Soup):
+    # https://miya.by/g8001755-pryazha-pehorka-detskaya
+    def __init__(self) -> None:
+        super().__init__()
+        self.shop = "miya"
+
+        self.url = "https://miya.by"
+        self.url_path = "/g8001755-pryazha-pehorka-detskaya/page_1"
+        self.url_get_param = "?product_items_per_page=48"
+        
+        # Selectors
+        self.selectors = {
+            "paginator_last_button": ".b-pager__link_pos_last",
+            "price": ".cs-goods-price span",
+            "color_block": ".cs-product-gallery__item",
+            "color_title": ".cs-goods-title",
+            "color_availability": ".cs-goods-data__state",
+        }
+
+    def set_next_link_by_paginator(self) -> str:
+        self.url_path = self.url_path[:-1] +  str(int(self.url_path[-1]) + 1) + self.url_get_param
+        return self.url + self.url_path
+
+    def get_price(self) -> float:
+        price_text = self.get_item(self.selectors.get('price')).text[:4].replace(',', '.')
+        return float(price_text)
     
-    {"title": "leonardo",
-    "url": "https://leonardohobby.by/ishop/group_6157356002/",
-    "selector": ".actual-price"},
+    def get_color_title(self, tag) -> list[str, str]:
+        title_fragments = self.get_item_in_tag(tag, self.selectors.get('color_title')).text.lower().strip().split()
+        result = [title_fragments[5], ' '.join(title_fragments[6:])]
+        match result:
+            case [str() as code, str()] if code.isdigit():
+                return result
+            case _:
+                return []
     
-    {"title": "klubok",
-    "url": "https://1klubok.by/pryazha-pehorka/detskaya-novinka",
-    "selector": "td.price-amount"},
+    def get_color_availability(self, tag) -> str:
+        return self.get_item_in_tag(tag, self.selectors.get('color_availability')).text.lower()
 
-    {"title": "yarnstore",
-    "url": "https://yarnstore.by/products/detskaya-novinka-pehorka",
-    "selector": ".tab-content div.price span",
-    "headers": {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'accept-encoding': 'gzip, deflate, br',
-        'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        'cache-control': 'max-age=0',
-        'cookie': 'PHPSESSID=h3tmppbickjivavvsq1gr4q650; _ga=GA1.2.1519017837.1672678506; _ym_uid=16726785061030010334; _ym_d=1672678506; browsed_products=270; _gid=GA1.2.2106586696.1675450826; _ym_isad=1; _ym_visorc=w',
-        'dnt': '1',
-        'sec-ch-ua': '"Not_A Brand";v="99", "Google Chrome";v="109", "Chromium";v="109"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': "Windows",
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'none',
-        'sec-fetch-user': '?1',
-        'upgrade-insecure-requests': '1',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-    }},
+    def start_parsing(self) -> dict:
+        url = self.url + self.url_path + self.url_get_param
+        self.get_page_source(url, True)
+        price = self.get_price()
+        colors_data = []
 
-    {"title": "zigzagshop",
-    "url": "https://zigzagshop.by/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj",
-    "selector": ".product-price-value > .product-price-col:nth-child(2) span"},
+        while True:
+            tags = self.get_items(self.selectors.get("color_block"))
+            for tag in tags:
+                title = self.get_color_title(tag)
+                if title:
+                    availability = self.get_color_availability(tag)
+                    title.append(availability)
+                    colors_data.append(title)
+            if self.is_item_present(self.selectors.get("paginator_last_button")):
+                new_link = self.set_next_link_by_paginator()
+                self.get_page_source(new_link, True)
+            else:
+                break
+        return self.preparing_data(self.shop, self.url, price, colors_data)
 
-    {"title": "петелька",
-    "url": "https://xn--80ajauevw6f.xn--90ais/p103514576-detskaya-novinka.html",
-    "selector": ".b-product-cost__price span:first-child"},
 
-    {"title": "kis",
-    "url": "https://kis.by/pryazha-detskaya-novinka-1-motka-50g-200m-pekhorka-18-persik",
-    "selector": ".price > span > span",
-    "headers": {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'accept-encoding': 'gzip, deflate, br',
-        'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        'cookie': 'PHPSESSID=hqkl6621ccibba10sk19u5kko5; default=4qgp20t4ug3jta4fo6khhp9715; _ga=GA1.1.1598234847.1672678657; _ym_uid=1672678657503890543; _ym_d=1672678657; language=ru-ru; currency=BYN; _ym_isad=1; _ym_visorc=w; _ga_FLBNXB63MG=GS1.1.1675516077.7.1.1675517154.0.0.0',
-        'dnt': '1',
-        'referer': 'https://kis.by/index.php?route=product/search&search=%D0%B4%D0%B5%D1%82%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%BA%D0%B0',
-        'sec-ch-ua': '"Not_A Brand";v="99", "Google Chrome";v="109", "Chromium";v="109"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': "Windows",
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'same-origin',
-        'sec-fetch-user': '?1',
-        'upgrade-insecure-requests': '1',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-    }},
-    
+class KisParser(Soup):
+    # https://kis.by/vyazanie/pryazha?rdrf%5Bstock%5D=instock&rdrf%5Bman%5D%5B0%5D=107&rdrf%5Bfil%5D%5B115%5D%5B0%5D=3408&limit=100
+    def __init__(self) -> None:
+        super().__init__()
 
-    {"title": "miya",
-    "url": "https://miya.by/p106143454-pryazha-pehorka-detskaya.html",
-    "selector": ".b-product-cost__price span"},
+        self.shop =  "kis"
+        self.url = "https://kis.by"
+        self.url_path = "/vyazanie/pryazha"
+        self.url_filter = "?rdrf%5Bstock%5D=instock&rdrf%5Bman%5D%5B0%5D=107&rdrf%5Bfil%5D%5B115%5D%5B0%5D=3408&limit=100"
 
-    # {"title": "https://kupimotok.by/",
-    # "url": "",
-    # "selector": ""},
-]
+        self.selectors = {
+            "link_from_first_item_in_catalog": "div.caption a",
 
-class MagicSoup:
-    def __init__(self, url: str, selector: str) -> float:
-        self.url = url
-        self.selector = selector
+            "price": ".price > span > span",
+            "price_sale": "span.price-new span.autocalc-product-special",
+            "color_link": "div.vblock a",
+            "color_title": ".h1-prod-name",
+            "color_availability": ".stock_status_success",
+        }
 
-    def cook_soup(self, site_headers) -> None:
-        response = requests.get(self.url, headers=site_headers)
+    def set_new_link(self) -> str:
+        link = self.get_item(self.selectors.get('link_from_first_item_in_catalog'))
+        return link.attrs['href']
 
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'lxml')
-            price = soup.select(self.selector)[0].text[:4]
-            if self.is_price_correct(price):
-                price = self.correct_comma_to_dot(price)
-            price = self.convert_price_to_float(price)
+    def get_price(self) -> float:
+        if self.is_item_present(self.selectors.get('price_sale')):
+            price_text = self.get_item(self.selectors.get('price_sale')).text
         else:
-            print('\n',response.status_code)
-            price = 0
-
+            price_text = self.get_item(self.selectors.get('price')).text
+        price = float(price_text[:4].replace(',', '.'))
         return price
 
-    # проверка на наличие в price символа <,>
-    def is_price_correct(self, price: str) -> bool:
-        return ',' in price
+    def get_color_title(self) -> list[str, str]:
+        title_text = self.get_item(self.selectors.get('color_title')).text.lower()
+        title_text = title_text.split(',')[-1]
+        title_text = title_text.strip().strip('№').replace('-', ' ')
+        title_fragments = title_text.split()
+        return [title_fragments[0], ' '.join(title_fragments[1:])]
 
-    # исправление символа <,> на <.>
-    def correct_comma_to_dot(self, price: str) -> str:
-        return price.replace(',', '.')
+    def get_color_availability(self) -> str:
+        item = self.get_item(self.selectors.get('color_availability'))
+        return item.text.lower() if item else 'нет в наличии'
 
-    # конвертация строкового значения price в float
-    def convert_price_to_float(self, price: str) -> float:
-        return float(price)
+    def start_parsing(self) -> dict:
+        url = self.url + self.url_path + self.url_filter
+        self.get_page_source(url)
+        new_link = self.set_new_link()
+        self.get_page_source(new_link)
+        
+        price = self.get_price()
+        colors_data = []
+        title = self.get_color_title()
+        availability = self.get_color_availability()
 
-def magic_soup() -> list:
-    data_set = []
-    for site in tqdm(SITES, desc='fetching data...', colour='green'):
-        data_set.append({'shop_name': site.get('title'), \
-            'shop_url': site.get('url'), 
-            'yarn_name': 'Pehorka', 
-            'yarn_price': MagicSoup(site.get('url', ''), site.get('selector', '')).cook_soup(site.get('headers', {}))})
-    return data_set
-    # return [MagicSoup(*site.values()).tasting() for site in tqdm(SITES, 'fetching data...', colour='green')]
+        title.append(availability)
+        colors_data.append(title)
+
+        color_links = [tag.attrs['href'] for tag in self.get_items(self.selectors.get('color_link'))]
+        for link in color_links:
+            self.get_page_source(link)
+            
+            title = self.get_color_title()
+            availability = self.get_color_availability()
+            title.append(availability)
+            colors_data.append(title)
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+class ZigzagParser(Soup):
+    # https://zigzagshop.by/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj
+    def __init__(self) -> None:
+        super().__init__()
+        self.shop = "zigzagshop"
+        self.url = "https://zigzagshop.by"
+        self.url_path = "/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj"
+
+        self.selectors = {
+            "price": ".product-price-value > .product-price-col:nth-child(2) span",
+            "color_block": ".combination-card",
+            "color_title": ".combination-image",
+            "color_availability": ""
+        }
+
+    def get_price(self) -> float:
+        price_text = self.get_item(self.selectors.get('price')).text[:4].replace(',', '.')
+        return float(price_text)
+
+    def get_color_title(self, tag) -> list[str, str]:
+        interim_title = self.get_item_in_tag(tag, self.selectors.get('color_title')).attrs['title'].lower().strip('№').split()
+        return [interim_title[0], ' '.join(interim_title[1:])]
+
+    def get_color_availability(self) -> str:
+        return 'в наличии'
+
+    def start_parsing(self) -> dict:
+        self.get_page_source(self.url + self.url_path)
+        
+        price = self.get_price()
+        colors_data = []
+        colors = self.get_items(self.selectors.get('color_block'))
+        
+        for color in colors:
+            title = self.get_color_title(color)
+            availability = self.get_color_availability()
+            title.append(availability)
+            colors_data.append(title)
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+class YarnstoreParser(Soup):
+    # https://yarnstore.by/products/detskaya-novinka-pehorka
+    def __init__(self) -> None:
+        super().__init__()
+        self.shop =  "yarnstore"
+        self.url = "https://yarnstore.by"
+        self.url_path = "/products/detskaya-novinka-pehorka"
+        self.selectors = {
+            "price": ".tab-content div.price span",
+            "color_block": ".variant_name2.ienlarger",
+            "color_title": "div:nth-child(2)",
+            "color_availability": "div:nth-child(4)",
+        }
+
+    def get_price(self) -> float:
+        price_text = self.get_item(self.selectors.get('price')).text[:4].replace(',', '.')
+        return float(price_text)
+    
+    def get_title(self, tag) -> list[str, str]:
+        title_fragments = self.get_item_in_tag(tag, self.selectors.get('color_title')).text.lower().strip().split()
+        return [title_fragments[1], ' '.join(title_fragments[2:])]
+    
+    def get_availability(self, tag) -> str:
+        return self.get_item_in_tag(tag, self.selectors.get('color_availability')).text.lower().strip()
+    
+    def start_parsing(self) -> dict:
+        url = self.url + self.url_path
+        self.get_page_source(url)
+        price = self.get_price()
+        colors_data = []
+        colors = self.get_items(self.selectors.get('color_block'))
+        for color in colors:
+            title = self.get_title(color)
+            availability = self.get_availability(color)
+            title.append(availability)
+            colors_data.append(title)
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+class KlubokParser(Soup):
+    # https://1klubok.by/pryazha-pehorka/detskaya-novinka
+    def __init__(self) -> None:
+        super().__init__()
+        
+        self.shop = "1klubok"
+        self.url = "https://1klubok.by"
+        self.url_path = "/pryazha-pehorka/detskaya-novinka"
+        self.page_num = '?page=0'
+        self.selectors = {
+            "pager_last": ".pager-last",
+            "price": "td.price-amount",
+            "color_block": ".group-anons",
+            "color_title": "a",
+            "color_availability": ".group-anons.views-fieldset .nalich2",
+        }
+
+    def get_price(self) -> float:
+        return float(self.get_item(self.selectors.get('price')).text[:4].replace(',', '.'))
+    
+    def get_title(self, tag) -> list[str, str]:
+        title_fragments: str = self.get_item_in_tag(tag, self.selectors.get('color_title')).text.lower().strip()
+        title_fragments = title_fragments.replace(' - ', ' ').replace(':', ' ').replace('-', ' ')
+        title_fragments = title_fragments.replace('детская новинка', '').replace('пехорка', '').replace('цвет', '').strip()
+        title_fragments = title_fragments.split()
+
+        return [title_fragments[0], ' '.join(title_fragments[1:])]
+    
+    def get_availability(self, tag) -> str:
+        return self.get_item_in_tag(tag, self.selectors.get('color_availability')).text.lower().strip()
+
+    def start_parsing(self) -> dict:
+        url = self.url + self.url_path + self.page_num
+        self.get_page_source(url)
+        price = self.get_price()
+        colors_data = []
+
+        while True:
+            color_blocks = self.get_items(self.selectors.get('color_block'))
+
+            for c_block in color_blocks:
+                title = self.get_title(c_block)
+                availability = self.get_availability(c_block)
+                title.append(availability)
+                colors_data.append(title)
+
+            if self.is_item_present(self.selectors.get('pager_last')):
+                self.page_num = self.page_num[:-1] + str(int(self.page_num[-1]) + 1)
+                next_url = self.url + self.url_path + self.page_num
+                self.get_page_source(next_url)
+            else:
+                break
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+class LeonardoParser(Soup):
+    # https://leonardohobby.by/ishop/group_6157356002/
+    def __init__(self) -> None:
+        super().__init__()
+        self.shop = "leonardo"
+        self.url = "https://leonardohobby.by"
+        self.url_path = "/ishop/group_6157356002/"
+        self.selectors = {
+            "price": ".actual-price",
+            "color_block": ".color-item",
+            "color_title": "a",
+        }
+
+    def get_price(self) -> float:
+        return float(self.get_item(self.selectors.get('price')).text[:4])
+    
+    def get_title(self, tag) -> list[str, str]:
+        title_sentence: str = tag.select_one(self.selectors.get('color_title')).attrs['title']
+        title_fragments = title_sentence.lower().replace('№', '').split()
+        return [title_fragments[0], ' '.join(title_fragments[1:])]
+    
+    def start_parsing(self) -> dict:
+        url = self.url + self.url_path
+        self.get_page_source(url)
+
+        price = self.get_price()
+        colors_data = []
+        c_blocks = self.get_items(self.selectors.get('color_block'))
+
+        for c_block in c_blocks:
+            title = self.get_title(c_block)
+            title.append("в наличии")
+            colors_data.append(title)
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+class NittiParser(Soup):
+    # https://nitti.by/catalog/pryazha_1/26470/
+    def __init__(self) -> None:
+        # super().__init__()
+        self.shop = "nitti"
+        self.url = "https://nitti.by"
+        self.url_path = "/catalog/pryazha_1/26470/"
+        self.selectors = {
+            "price": ".info_item span.price_value",
+            "color_block": "#bx_117848907_26470_prop_1161_list li",
+            "color_title": "i",
+            "color_availability": "",
+        }
+
+    def create_list_of_urls(self):
+        url = self.url + self.url_path
+        self.get_page_source(url)
+
+        x_path_selector = "//span[@itemprop='offers']/span[@itemprop='offers']"
+        dom = etree.HTML(str(self.soup))
+        self.url_parametrs = []
+        for el in dom.xpath(x_path_selector):
+            self.url_parametrs.append(el.find('a').get('href').split('?')[-1])
+
+    def preparing_web_source(self):
+        url = self.url + self.url_path
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+        self.driver = webdriver.Chrome(options=options)
+        self.driver.set_window_size(1920, 1080)
+        self.driver.get(url)
+
+    def get_price(self) -> float:
+        text = self.driver.find_element(By.CSS_SELECTOR, '.info_item span.price_value').get_attribute('textContent')
+        return float(text.replace(',', '.')[:4])
+
+    def get_title(self) -> list[str, str]:
+        title_fragments = self.driver.find_element(By.CSS_SELECTOR, '#bx_117848907_26470_skudiv .val').text.lower().split('-')
+        return [title_fragments[0], ' '.join(title_fragments[1:])]
+
+    def get_availability(self) -> str:
+        return self.driver.find_element(By.CSS_SELECTOR, '.quantity_block_wrapper span.value').get_attribute('textContent').lower()
+
+    def start_parsing(self) -> dict:
+        self.preparing_web_source()
+        price = self.get_price()
+        colors_data = []
+
+        c_blocks = self.driver.find_elements(By.CSS_SELECTOR, '#bx_117848907_26470_prop_1161_list li')
+        for block in c_blocks:
+            block.click()
+            title = self.get_title()
+            availability = self.get_availability()
+            title.append(availability)
+            colors_data.append(title)
+        self.driver.quit()
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+class PetelkaParser(Soup):
+    # https://xn--80ajauevw6f.xn--90ais/p103514576-detskaya-novinka.html
+    def __init__(self) -> None:
+        super().__init__()
+        self.shop = "петелька"
+        self.url = "https://xn--80ajauevw6f.xn--90ais"
+        self.url_path = "/p103514576-detskaya-novinka.html"
+        self.selectrors = {
+            "price": ".b-product-cost__price span:first-child",
+        }
+
+    def get_price(self) -> float:
+        return float(self.get_item(self.selectrors.get('price')).text[:4])
+    
+    def start_parsing(self) -> dict:
+        url = self.url + self.url_path
+        self.get_page_source(url)
+
+        price = self.get_price()
+        colors_data = []
+        return self.preparing_data(self.shop, self.url, price, colors_data)
+
+
+def create_data_set():
+    parsers = [
+        MiyaParser, 
+        KisParser, 
+        ZigzagParser, 
+        YarnstoreParser, 
+        KlubokParser, 
+        LeonardoParser, 
+        NittiParser, 
+        # PetelkaParser
+    ]
+    return [parser().start_parsing() for parser in parsers]
 
 if __name__ == '__main__':
-    for data_element in magic_soup():
-        print(data_element)
+    pprint(create_data_set())

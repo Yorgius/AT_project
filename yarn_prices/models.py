@@ -9,11 +9,23 @@ class Shop(models.Model):
         return self.name
 
 
-class Yarn(models.Model):
+class YarnCategory(models.Model):
     name = models.CharField(max_length=200, blank=True)
-    price = models.FloatField(blank=True)
-    date_added = models.DateField(auto_now_add=True)
     shop = models.ForeignKey('Shop', on_delete=models.PROTECT, blank=True)
 
     def __str__(self) -> str:
         return self.name
+
+class YarnDetails(models.Model):
+    yarn = models.ForeignKey('YarnCategory', on_delete=models.PROTECT, blank=True)
+    price = models.FloatField(blank=True)
+    date = models.DateField(auto_now_add=True, blank=True)
+
+class ColorsAvailability(models.Model):
+    yarn = models.ForeignKey('YarnCategory', on_delete=models.PROTECT, blank=True)
+    code = models.CharField(max_length=10, blank=True)
+    name = models.CharField(max_length=200, blank=True)
+    availability = models.CharField(max_length=200, blank=True)
+
+    def __str__(self) -> str:
+        return self.code
