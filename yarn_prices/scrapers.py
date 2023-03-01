@@ -14,6 +14,7 @@ from requests import session
 from pprint import pprint
 
 
+# base parser
 class Soup:
     def __init__(self) -> None:
         self.headers = {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'}
@@ -60,8 +61,8 @@ class Soup:
         }
 
 
+# https://miya.by/g8001755-pryazha-pehorka-detskaya
 class MiyaParser(Soup):
-    # https://miya.by/g8001755-pryazha-pehorka-detskaya
     def __init__(self) -> None:
         super().__init__()
         self.shop = "miya"
@@ -121,8 +122,8 @@ class MiyaParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://kis.by/vyazanie/pryazha?rdrf%5Bstock%5D=instock&rdrf%5Bman%5D%5B0%5D=107&rdrf%5Bfil%5D%5B115%5D%5B0%5D=3408&limit=100
 class KisParser(Soup):
-    # https://kis.by/vyazanie/pryazha?rdrf%5Bstock%5D=instock&rdrf%5Bman%5D%5B0%5D=107&rdrf%5Bfil%5D%5B115%5D%5B0%5D=3408&limit=100
     def __init__(self) -> None:
         super().__init__()
 
@@ -189,8 +190,8 @@ class KisParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://zigzagshop.by/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj
 class ZigzagParser(Soup):
-    # https://zigzagshop.by/pryazha-pehorskaya-pt/16005-26369-detskaya-novinka.html#/14618-cvet-011_yarrozovyj
     def __init__(self) -> None:
         super().__init__()
         self.shop = "zigzagshop"
@@ -230,8 +231,8 @@ class ZigzagParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://yarnstore.by/products/detskaya-novinka-pehorka
 class YarnstoreParser(Soup):
-    # https://yarnstore.by/products/detskaya-novinka-pehorka
     def __init__(self) -> None:
         super().__init__()
         self.shop =  "yarnstore"
@@ -269,8 +270,8 @@ class YarnstoreParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://1klubok.by/pryazha-pehorka/detskaya-novinka
 class KlubokParser(Soup):
-    # https://1klubok.by/pryazha-pehorka/detskaya-novinka
     def __init__(self) -> None:
         super().__init__()
         
@@ -324,8 +325,8 @@ class KlubokParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://leonardohobby.by/ishop/group_6157356002/
 class LeonardoParser(Soup):
-    # https://leonardohobby.by/ishop/group_6157356002/
     def __init__(self) -> None:
         super().__init__()
         self.shop = "leonardo"
@@ -360,8 +361,8 @@ class LeonardoParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://nitti.by/catalog/pryazha_1/26470/
 class NittiParser(Soup):
-    # https://nitti.by/catalog/pryazha_1/26470/
     def __init__(self) -> None:
         # super().__init__()
         self.shop = "nitti"
@@ -419,8 +420,8 @@ class NittiParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
+# https://xn--80ajauevw6f.xn--90ais/p103514576-detskaya-novinka.html
 class PetelkaParser(Soup):
-    # https://xn--80ajauevw6f.xn--90ais/p103514576-detskaya-novinka.html
     def __init__(self) -> None:
         super().__init__()
         self.shop = "петелька"
@@ -442,7 +443,7 @@ class PetelkaParser(Soup):
         return self.preparing_data(self.shop, self.url, price, colors_data)
 
 
-def create_data_set():
+def create_data_set() -> list:
     parsers = [
         MiyaParser, 
         KisParser, 
