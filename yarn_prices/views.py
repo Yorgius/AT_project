@@ -20,21 +20,28 @@ def show_home_page(request):
 def show_charts_page(request):
     # Если в базе нет записи с текущей датой
     todays_day = datetime.now().date()
+
     if not YarnDetails.objects.filter(date=todays_day).exists():
         parse_data_and_save_to_db()
-    return render(request, 'yarn_prices/charts.html', context={'title': 'Charts'})
 
+    colors_query_set = ColorsAvailability.objects.values('code', 'name').order_by('name')
+    context = {
+        'title': 'Charts',
+        'colors_set': create_colors_data_set(colors_query_set)
+    }
+    return render(request, 'yarn_prices/charts.html', context=context)
+
+# конфигурация столбчатой диаграммы
 def column_chart_data(request):
-    # подготовка данных для графика
+    # подготовка датасета для графика
     today = datetime.now().date()
     data_values = []
     details = YarnDetails.objects.select_related('yarn').filter(date=today).order_by('price')
     for yd in details:
-        # categories.append(yarn.shop.name)
         shop = yd.yarn.shop.name
         data_values.append([shop, yd.price])
     
-    # конфигурация данных для графика
+    # конфигурация данных для графика series
     data = [{
         'name': 'Цена',
         'data': data_values,
@@ -64,8 +71,9 @@ def column_chart_data(request):
 
     return JsonResponse(chart)
 
+# конфигурация линейных графиков
 def basic_line_chart_data(request):
-    # подготовка данных для графика
+    # подготовка датасета для графика
     yarns_categories = YarnCategory.objects.select_related('shop').all()
     data_set = []
     for category in yarns_categories:
@@ -186,3 +194,9 @@ def parse_data_and_save_to_db() -> None:
             return redirect('yarn_prices_urls:home')
     return redirect('yarn_prices_urls:charts')
 
+def create_colors_data_set(colors_query_set):
+    colors_set = {}
+    for color in colors_query_set:
+        if not color['code'] in colors_set.keys():
+            colors_set.update({color['code']: color['name']})
+    return colors_set
