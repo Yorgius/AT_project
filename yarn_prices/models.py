@@ -23,9 +23,9 @@ class YarnDetails(models.Model):
 
 class ColorsAvailability(models.Model):
     yarn = models.ForeignKey('YarnCategory', on_delete=models.PROTECT, blank=True)
-    code = models.CharField(max_length=10, blank=True)
+    code = models.IntegerField(blank=True)
     name = models.CharField(max_length=200, blank=True)
     availability = models.CharField(max_length=200, blank=True)
 
     def __str__(self) -> str:
-        return self.code
+        return self.name

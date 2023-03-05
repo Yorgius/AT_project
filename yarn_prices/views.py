@@ -24,10 +24,12 @@ def show_charts_page(request):
     if not YarnDetails.objects.filter(date=todays_day).exists():
         parse_data_and_save_to_db()
 
-    colors_query_set = ColorsAvailability.objects.values('code', 'name').order_by('name')
+    colors_query_set = ColorsAvailability.objects.values('code', 'name').order_by('code')
+    colors_set = create_colors_data_set(colors_query_set)
+
     context = {
         'title': 'Charts',
-        'colors_set': create_colors_data_set(colors_query_set)
+        'colors_set': colors_set,
     }
     return render(request, 'yarn_prices/charts.html', context=context)
 
@@ -180,10 +182,10 @@ def parse_data_and_save_to_db() -> None:
 
             for color in data.get('colors'):
                 if not ColorsAvailability.objects.filter(code=color[0], yarn=yarn).exists():
-                    ColorsAvailability.objects.create(yarn=yarn, code=color[0], 
+                    ColorsAvailability.objects.create(yarn=yarn, code=int(color[0]), 
                                                     name=color[1], availability=color[2])
                 else:
-                    color_obj = ColorsAvailability.objects.get(code=color[0], yarn=yarn)
+                    color_obj = ColorsAvailability.objects.get(code=int(color[0]), yarn=yarn)
                     color_obj.name = color[1]
                     color_obj.availability = color[2]
                     color_obj.save()
@@ -200,3 +202,17 @@ def create_colors_data_set(colors_query_set):
         if not color['code'] in colors_set.keys():
             colors_set.update({color['code']: color['name']})
     return colors_set
+
+def ajax_colors_list_on_request(request):
+    not_available = ['нет в наличии']
+
+    if request.method == 'POST':
+        color_code = int(request.POST.get('submit'))
+        colors = ColorsAvailability.objects.select_related('yarn').filter(code=color_code)
+
+        response = {'color_code': color_code, 'color_name': colors[0].name, 'available': []}
+        for color in colors:
+            if not color.availability in not_available:
+                response['available'].append({'shop': color.yarn.shop.name, 'availability':  color.availability})
+        print(response)
+        return JsonResponse(response)

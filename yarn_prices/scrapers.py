@@ -51,6 +51,9 @@ class Soup:
     def get_item_in_tag(self, tag, selector):
         return tag.select_one(selector)
 
+    def text_to_digit(self, text: str) -> float:
+        return float(text.replace(',', '.'))
+
     def preparing_data(self, shop, url, price, colors) -> dict:
         return {
             'shop': shop,
@@ -85,12 +88,12 @@ class MiyaParser(Soup):
         return self.url + self.url_path
 
     def get_price(self) -> float:
-        price_text = self.get_item(self.selectors.get('price')).text[:4].replace(',', '.')
-        return float(price_text)
+        price_text = self.get_item(self.selectors.get('price')).text[:4]
+        return self.text_to_digit(price_text)
     
     def get_color_title(self, tag) -> list[str, str]:
         title_fragments = self.get_item_in_tag(tag, self.selectors.get('color_title')).text.lower().strip().split()
-        result = [title_fragments[5], ' '.join(title_fragments[6:])]
+        result = [title_fragments[5].lstrip('0'), ' '.join(title_fragments[6:])]
         match result:
             case [str() as code, str()] if code.isdigit():
                 return result
@@ -148,18 +151,17 @@ class KisParser(Soup):
 
     def get_price(self) -> float:
         if self.is_item_present(self.selectors.get('price_sale')):
-            price_text = self.get_item(self.selectors.get('price_sale')).text
+            price_text = self.get_item(self.selectors.get('price_sale')).text[:4]
         else:
-            price_text = self.get_item(self.selectors.get('price')).text
-        price = float(price_text[:4].replace(',', '.'))
-        return price
+            price_text = self.get_item(self.selectors.get('price')).text[:4]
+        return self.text_to_digit(price_text)
 
     def get_color_title(self) -> list[str, str]:
         title_text = self.get_item(self.selectors.get('color_title')).text.lower()
         title_text = title_text.split(',')[-1]
         title_text = title_text.strip().strip('№').replace('-', ' ')
         title_fragments = title_text.split()
-        return [title_fragments[0], ' '.join(title_fragments[1:])]
+        return [title_fragments[0].lstrip('0'), ' '.join(title_fragments[1:])]
 
     def get_color_availability(self) -> str:
         item = self.get_item(self.selectors.get('color_availability'))
@@ -206,12 +208,12 @@ class ZigzagParser(Soup):
         }
 
     def get_price(self) -> float:
-        price_text = self.get_item(self.selectors.get('price')).text[:4].replace(',', '.')
-        return float(price_text)
+        price_text = self.get_item(self.selectors.get('price')).text[:4]
+        return self.text_to_digit(price_text)
 
     def get_color_title(self, tag) -> list[str, str]:
         interim_title = self.get_item_in_tag(tag, self.selectors.get('color_title')).attrs['title'].lower().strip('№').split()
-        return [interim_title[0], ' '.join(interim_title[1:])]
+        return [interim_title[0].lstrip('0'), ' '.join(interim_title[1:])]
 
     def get_color_availability(self) -> str:
         return 'в наличии'
@@ -246,12 +248,12 @@ class YarnstoreParser(Soup):
         }
 
     def get_price(self) -> float:
-        price_text = self.get_item(self.selectors.get('price')).text[:4].replace(',', '.')
-        return float(price_text)
+        price_text = self.get_item(self.selectors.get('price')).text[:4]
+        return self.text_to_digit(price_text)
     
     def get_title(self, tag) -> list[str, str]:
         title_fragments = self.get_item_in_tag(tag, self.selectors.get('color_title')).text.lower().strip().split()
-        return [title_fragments[1], ' '.join(title_fragments[2:])]
+        return [title_fragments[1].lstrip('0'), ' '.join(title_fragments[2:])]
     
     def get_availability(self, tag) -> str:
         return self.get_item_in_tag(tag, self.selectors.get('color_availability')).text.lower().strip()
@@ -288,7 +290,8 @@ class KlubokParser(Soup):
         }
 
     def get_price(self) -> float:
-        return float(self.get_item(self.selectors.get('price')).text[:4].replace(',', '.'))
+        price_text = self.get_item(self.selectors.get('price')).text[:4]
+        return self.text_to_digit(price_text)
     
     def get_title(self, tag) -> list[str, str]:
         title_fragments: str = self.get_item_in_tag(tag, self.selectors.get('color_title')).text.lower().strip()
@@ -296,7 +299,7 @@ class KlubokParser(Soup):
         title_fragments = title_fragments.replace('детская новинка', '').replace('пехорка', '').replace('цвет', '').strip()
         title_fragments = title_fragments.split()
 
-        return [title_fragments[0], ' '.join(title_fragments[1:])]
+        return [title_fragments[0].lstrip('0'), ' '.join(title_fragments[1:])]
     
     def get_availability(self, tag) -> str:
         return self.get_item_in_tag(tag, self.selectors.get('color_availability')).text.lower().strip()
@@ -339,12 +342,13 @@ class LeonardoParser(Soup):
         }
 
     def get_price(self) -> float:
-        return float(self.get_item(self.selectors.get('price')).text[:4])
+        price_text = self.get_item(self.selectors.get('price')).text[:4]
+        return self.text_to_digit(price_text)
     
     def get_title(self, tag) -> list[str, str]:
         title_sentence: str = tag.select_one(self.selectors.get('color_title')).attrs['title']
         title_fragments = title_sentence.lower().replace('№', '').split()
-        return [title_fragments[0], ' '.join(title_fragments[1:])]
+        return [title_fragments[0].lstrip('0'), ' '.join(title_fragments[1:])]
     
     def start_parsing(self) -> dict:
         url = self.url + self.url_path
@@ -394,12 +398,12 @@ class NittiParser(Soup):
         self.driver.get(url)
 
     def get_price(self) -> float:
-        text = self.driver.find_element(By.CSS_SELECTOR, '.info_item span.price_value').get_attribute('textContent')
-        return float(text.replace(',', '.')[:4])
+        price_text = self.driver.find_element(By.CSS_SELECTOR, '.info_item span.price_value').get_attribute('textContent')[:4]
+        return self.text_to_digit(price_text)
 
     def get_title(self) -> list[str, str]:
         title_fragments = self.driver.find_element(By.CSS_SELECTOR, '#bx_117848907_26470_skudiv .val').text.lower().split('-')
-        return [title_fragments[0], ' '.join(title_fragments[1:])]
+        return [title_fragments[0].lstrip('0'), ' '.join(title_fragments[1:])]
 
     def get_availability(self) -> str:
         return self.driver.find_element(By.CSS_SELECTOR, '.quantity_block_wrapper span.value').get_attribute('textContent').lower()
@@ -454,7 +458,7 @@ def create_data_set() -> list:
         NittiParser, 
         # PetelkaParser
     ]
-    return [parser().start_parsing() for parser in parsers]
+    return [parser().start_parsing() for parser in tqdm(parsers, colour='green', desc='Fetching data...')]
 
 if __name__ == '__main__':
     pprint(create_data_set())

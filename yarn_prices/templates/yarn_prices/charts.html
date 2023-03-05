@@ -9,6 +9,10 @@
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
 
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
+
+
 {% comment %} Стили графика {% endcomment %}
 <style>
   #container {
@@ -58,30 +62,49 @@
       background: #f1f7ff;
   }
 </style>
-
 {% endblock head %}
 
 
 {% block content %}
-
 {% comment %} charts containers {% endcomment %}
-<div class="container text-center">
+<div class="container">
   <div class="row">
-    <div class="col-sm-3">
-      <div>
-        {% for key, name in colors_set.items %}
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
-          <label class="form-check-label" for="flexCheckDefault">
-            {{ key }} {{ name }}
-          </label>
-        </div>
-        {% endfor %}
+    
+    <!-- секция поиска по цветам -->
+    <div class="col-sm-4">
+      <!-- форма -->
+      <div class="container-fluid">
+        
+        <form  id="ajax_form" data-url="{% url 'yarn_prices_urls:ajax_colors' %}" class="" action="" method="post">
+          {% csrf_token %}
+            <div class="dropdown mb-2 mb-lg-0 me-2">
+              <input id="colors_search" class="form-control me-2 dropdown-toggle" type="search" data-bs-toggle="dropdown" placeholder="Выбери цвет">
+              <ul class="dropdown-menu">
+                <div style="max-height: 500px;" class="overflow-auto">
+                  {% for key, val in colors_set.items %}
+                  <li><button name="submit" type="submit" class="dropdown-item" value="{{key}}">{{ key }} - {{ val }}</button></li>
+                  {% endfor %}
+                </div>
+              </ul>
+            </div>
+        </form>
+        <hr>
+        <p style="font-size: small;">* Если в результатах поиска отсутствует какой-либо магазин, значит информация по товару на сайте данного магазина отсутствует или товара нет в наличии</p>
+        <hr>
       </div>
-      <button type="button" class="btn btn-light">Найти</button>
+      
+      <!-- результаты поиска -->
+      <div id="ajax_response" class="container row">
+        <div id="shop_names_response" class="col"></div>
+        <div id="available_response" class="col"></div>
+      </div>
     </div>
+
+    <!-- Секция графиков -->
     <div class="col">
         <div class="accordion" id="accordionExample">
+            <!-- column chart  -->
+            <!-- Price comparison chart for the current date among stores -->
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingOne">
                 <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
@@ -90,25 +113,14 @@
               </h2>
               <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
                 <div class="accordion-body">
-                    {% comment %} column chart {% endcomment %}
-                    {% comment %} Price comparison chart for the current date among stores {% endcomment %}
                     <figure class="highcharts-figure">
                         <div id="column_chart" data-url="{% url 'yarn_prices_urls:column_chart_data' %}"></div>
                     </figure>
-                    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-                    {% comment %} ajax request {% endcomment %}
-                    <script>
-                        $.ajax({
-                        url: $("#column_chart").attr("data-url"),
-                        dataType: 'json',
-                        success: function (data) {
-                            Highcharts.chart("column_chart", data);
-                        }
-                        });
-                    </script>
                 </div>
               </div>
             </div>
+            <!-- basic line chart -->
+            <!-- dynamics of price changes over a period of time -->
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingTwo">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
@@ -117,23 +129,11 @@
               </h2>
               <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionExample">
                 <div class="accordion-body">
-                    {% comment %} basic line chart {% endcomment %}
-                    {% comment %} dynamics of price changes over a period of time {% endcomment %}
-                    <figure class="highcharts-figure">
-                        <div id="basic_line_chart" data-url="{% url 'yarn_prices_urls:basic_line_chart_data' %}"></div>
-                        <label for="customRange3" class="form-label">Динамика за</label>
-                        <input type="range" class="form-range" min="1" max="3" step="1" id="customRange3">
-                    </figure>
-                    
-                    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-                    {% comment %} ajax request {% endcomment %}
-                    <script>
-                        $.ajax({
-                            url: $("#basic_line_chart").attr("data-url"),
-                            dataType: 'json',
-                            success: function (data) {Highcharts.chart("basic_line_chart", data);} 
-                        });
-                    </script>
+                  <figure class="highcharts-figure">
+                    <div id="basic_line_chart" data-url="{% url 'yarn_prices_urls:basic_line_chart_data' %}"></div>
+                    <label for="customRange3" class="form-label">Динамика за</label>
+                    <input type="range" class="form-range" min="1" max="3" step="1" id="customRange3">
+                  </figure>
                 </div>
               </div>
             </div>
@@ -153,4 +153,55 @@
   </div>
 </div>
 
+<!-- column chart ajax -->
+<script>
+  $.ajax({
+  url: $("#column_chart").attr("data-url"),
+  dataType: 'json',
+  success: function (data) {
+      Highcharts.chart("column_chart", data);
+  }
+  });
+</script>
+
+<!-- line chart ajax -->
+<script>
+    $.ajax({
+        url: $("#basic_line_chart").attr("data-url"),
+        dataType: 'json',
+        success: function (data) {Highcharts.chart("basic_line_chart", data);} 
+    });
+</script>
+
+<!-- colors list ajax -->
+<script>
+  $(document).ready(function(event){
+    $("#ajax_form button[type=submit]").click(function(event){
+      event.preventDefault();
+      var data = $("#ajax_form").serializeArray();
+      var key = $(this).attr('name');
+      var val = $(this).attr('value');
+
+      $("ajax_response").html('');
+      $("#shop_names_response").html('');
+      $("#available_response").html('');
+      data.push({'name': key, 'value': val});
+      console.log(typeof(data));
+      console.log(data);
+      $.post(
+        $("#ajax_form").attr("data-url"),
+        data,
+        function(response){
+          var placeholder_text = response.color_code + ' ' + response.color_name;
+          var shops = response.available;
+          $("#colors_search").attr('placeholder', placeholder_text);
+          shops.forEach(function(el){
+            $("#shop_names_response").append('<p>' + el.shop + '</p>');
+            $("#available_response").append('<p>' + ' - ' + el.availability  + '</p>');
+          });
+        } 
+      );
+    });
+  });
+</script>
 {% endblock content %}
