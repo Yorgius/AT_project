@@ -18,14 +18,8 @@ def show_home_page(request):
 
 # визуализация полученных данных в HighCharts
 def show_charts_page(request):
-    # Если в базе нет записи с текущей датой
-    todays_day = datetime.now().date()
-
-    if not YarnDetails.objects.filter(date=todays_day).exists():
-        parse_data_and_save_to_db()
-
     colors_query_set = ColorsAvailability.objects.values('code', 'name').order_by('code')
-    colors_set = create_colors_data_set(colors_query_set)
+    colors_set = create_colors_range(colors_query_set)
 
     context = {
         'title': 'Charts',
@@ -33,16 +27,41 @@ def show_charts_page(request):
     }
     return render(request, 'yarn_prices/charts.html', context=context)
 
+# подготовка данных для графиков в ответ на ajax запрос
+def get_data_for_the_charts(request):
+    # Если в базе нет записи с текущей датой
+    todays_day = datetime.now().date()
+
+    if not YarnDetails.objects.filter(date=todays_day).exists():
+        parse_data_and_save_to_db()
+
+    column_chart = set_column_chart_config()
+    line_chart = set_basic_line_chart_config()
+
+    response = {
+        'column_chart': column_chart,
+        'line_chart': line_chart
+    }
+
+    return JsonResponse(response)
+
 # конфигурация столбчатой диаграммы
-def column_chart_data(request):
+def set_column_chart_config(shops_list=None) -> dict:
     # подготовка датасета для графика
     today = datetime.now().date()
     data_values = []
-    details = YarnDetails.objects.select_related('yarn').filter(date=today).order_by('price')
-    for yd in details:
-        shop = yd.yarn.shop.name
-        data_values.append([shop, yd.price])
-    
+    if not shops_list:
+        details = YarnDetails.objects.select_related('yarn').filter(date=today).order_by('price')
+        for yd in details:
+            shop = yd.yarn.shop.name
+            data_values.append([shop, yd.price])
+    else:
+        for shop in shops_list:
+            yarn_id = shop.yarncategory_set.get().pk
+            details = YarnDetails.objects.get(date=today, yarn=yarn_id)
+            data_values.append([shop.name, details.price])
+            data_values.sort(key=lambda x: x[1])
+
     # конфигурация данных для графика series
     data = [{
         'name': 'Цена',
@@ -71,10 +90,10 @@ def column_chart_data(request):
         'series': data,
     }
 
-    return JsonResponse(chart)
+    return chart
 
 # конфигурация линейных графиков
-def basic_line_chart_data(request):
+def set_basic_line_chart_config() -> dict:
     # подготовка датасета для графика
     yarns_categories = YarnCategory.objects.select_related('shop').all()
     data_set = []
@@ -161,7 +180,7 @@ def basic_line_chart_data(request):
         }
     }
 
-    return JsonResponse(chart)
+    return chart
 
 # the function starts the BS4 web parser and saves the received data to the database
 def parse_data_and_save_to_db() -> None:
@@ -196,23 +215,36 @@ def parse_data_and_save_to_db() -> None:
             return redirect('yarn_prices_urls:home')
     return redirect('yarn_prices_urls:charts')
 
-def create_colors_data_set(colors_query_set):
+# подготовка списка цветов из базы для dropdown list
+def create_colors_range(colors_query_set) -> dict:
     colors_set = {}
     for color in colors_query_set:
         if not color['code'] in colors_set.keys():
             colors_set.update({color['code']: color['name']})
     return colors_set
 
-def ajax_colors_list_on_request(request):
+# response для ajax по выбору цвета из dropdown
+def colors_list_ajax_response(request) -> dict:
     not_available = ['нет в наличии']
 
     if request.method == 'POST':
         color_code = int(request.POST.get('submit'))
         colors = ColorsAvailability.objects.select_related('yarn').filter(code=color_code)
 
-        response = {'color_code': color_code, 'color_name': colors[0].name, 'available': []}
+        shops_list = []
+        available = []
         for color in colors:
             if not color.availability in not_available:
-                response['available'].append({'shop': color.yarn.shop.name, 'availability':  color.availability})
-        print(response)
+                shop = color.yarn.shop
+                available.append({'shop': shop.name, 'shop_url': shop.url, 'availability':  color.availability})
+                shops_list.append(shop)
+
+        column_chart = set_column_chart_config(shops_list)
+
+        response = {
+            'color_code': color_code,
+            'color_name': colors[0].name,
+            'available': available,
+            'column_chart': column_chart
+        }
         return JsonResponse(response)

@@ -8,10 +8,6 @@ app_name = 'yarn_prices_urls'
 urlpatterns = [
     path('', show_home_page, name='home'),
     path('charts/', show_charts_page, name='charts'),
-    path('column-chart-data/', column_chart_data, name='column_chart_data'),
-    path('b-line-chart-data/', basic_line_chart_data, name='basic_line_chart_data'),
-    # path('charts/show_colors_availability/', show_colors_availability_on_page, name='show_colors_availability'),
-
-
-    path('ajax_colors/', ajax_colors_list_on_request, name='ajax_colors')
+    path("get-data-for-the-charts", get_data_for_the_charts, name="charts_data"),
+    path('ajax_colors/', colors_list_ajax_response, name='ajax_colors'),
 ]
