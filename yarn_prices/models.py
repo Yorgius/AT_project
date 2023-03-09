@@ -21,9 +21,6 @@ class YarnDetails(models.Model):
     price = models.FloatField(blank=True)
     date = models.DateField(auto_now_add=True, blank=True)
 
-    def __str__(self) -> str:
-        return self.yarn.shop.name
-
 class ColorsAvailability(models.Model):
     yarn = models.ForeignKey('YarnCategory', on_delete=models.PROTECT, blank=True)
     code = models.IntegerField(blank=True)

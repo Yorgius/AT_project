@@ -5,9 +5,6 @@ from datetime import datetime
 from .models import *
 from .scrapers import create_data_set
 
-from pprint import pprint
-
-
 # main page
 def show_home_page(request):
     text = 'With the help of this site, \
@@ -229,7 +226,7 @@ def colors_list_ajax_response(request) -> dict:
 
     if request.method == 'POST':
         color_code = int(request.POST.get('submit'))
-        colors = ColorsAvailability.objects.select_related('yarn').filter(code=color_code)
+        colors = ColorsAvailability.objects.select_related('yarn', 'yarn__shop').filter(code=color_code)
 
         shops_list = []
         available = []
