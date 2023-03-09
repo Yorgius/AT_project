@@ -68,6 +68,7 @@
 {% block content %}
 {% comment %} charts containers {% endcomment %}
 <div class="container">
+  <p id="fetching_data_message">Данные еще не загрузились, это может занять несколько минут ...</p>
   <div class="row">
     
     <!-- секция поиска по цветам -->
@@ -152,6 +153,7 @@
   success: function (data) {
       Highcharts.chart("column_chart", data.column_chart);
       Highcharts.chart("basic_line_chart", data.line_chart);
+      $('#fetching_data_message').html('')
   }
   });
 </script>
